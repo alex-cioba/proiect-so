@@ -52,10 +52,13 @@ void add_treasure(const char* hunt_id)
   scanf("%s", t.username);
 
   printf("Coordinates: ");
-  scanf("%s", t.location);
+  getchar(); //for the '\n' from last scanf()
+  fgets(t.location, sizeof(t.location), stdin);
+  t.location[strlen(t.location) - 1] = '\0';
 
   printf("Clue: ");
   fgets(t.clue, sizeof(t.clue), stdin);
+  t.clue[strlen(t.clue) - 1] = '\0';
 
   printf("Value: ");
   scanf("%s", t.value);
@@ -68,15 +71,32 @@ void add_treasure(const char* hunt_id)
   
 }
 
-void view(const char* hunt_id)
+void list(const char* hunt_id)
 {
   char path[50];
   strcpy(path, hunt_id);
   strcat(path, "/treasures.bin");
 
-  open(path, O_RDONLY);
+  int f = open(path, O_RDONLY);
 
-  
+  struct stat info;
+  stat(path, &info);
+  printf("Hunt: %s\n", hunt_id);
+  printf("File size: %ld bytes\n", info.st_size);
+  printf("Last modification: %ld\n", info.st_mtime);
+
+  treasure t;
+  printf("Treasures:\n");
+  while(read(f, &t, sizeof(treasure)) == sizeof(treasure))
+    {
+      printf("ID: %s | ", t.id);
+      printf("Username: %s | ", t.username);
+      printf("Location: %s | ", t.location);
+      printf("Clue: %s | ", t.clue);
+      printf("Value:%s\n", t.value);
+    }
+
+  close(f);
 }
 
 
@@ -94,9 +114,12 @@ int main(int argc, char** argv)
       printf("Am primit comanda add pentru hunt-ul: %s\n", hunt_id);
       add_treasure(hunt_id);
     }
-  else
+
+  if(strcmp(argv[1], "--list") == 0)
     {
-      printf("Comanda necunoscuta: %s\n", argv[1]);
+      const char* hunt_id = argv[2];
+      list(hunt_id);
     }
+  
   return 0;
 }

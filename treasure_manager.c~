@@ -22,22 +22,61 @@ void add_treasure(const char* hunt_id)
 {
   struct stat st;
 
-  if(stat(hunt_id, &st) == -1)
+  if(stat(hunt_id, &st) == -1) //checks if hunt_id exists
     {
       if(mkdir(hunt_id, 0777) == -1)
 	{
-	  perror("Eroare la mkdir");
+	  perror("Eroare creare director\n");
 	  exit(1);
 	}
       else
 	{
-	  printf("Directorul %s a fost creat.\n", hunt_id);
+	  printf("Directorul %s a fost creat\n", hunt_id);
 	}
     }
-  else
-    {
-      printf("Directorul %s exista deja.\n", hunt_id);
-    }
+
+  //file path (hunt_id/treasures.bin)
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+
+  //file creation
+  int f = open(path, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+
+  //reading
+  treasure t;
+  printf("ID: ");
+  scanf("%s", t.id);
+
+  printf("Username: ");
+  scanf("%s", t.username);
+
+  printf("Coordinates: ");
+  scanf("%s", t.location);
+
+  printf("Clue: ");
+  fgets(t.clue, sizeof(t.clue), stdin);
+
+  printf("Value: ");
+  scanf("%s", t.value);
+  
+
+  //writting
+  write(f, &t, sizeof(treasure));
+
+  close(f); //close the binary file
+  
+}
+
+void view(const char* hunt_id)
+{
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+
+  open(path, O_RDONLY);
+
+  
 }
 
 
