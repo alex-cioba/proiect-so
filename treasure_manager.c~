@@ -1,0 +1,63 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+
+
+typedef struct treasure
+{
+  char id[50];
+  char username[50];
+  char location[50];
+  char clue[100];
+  char value[50];
+}treasure;
+
+
+void add_treasure(const char* hunt_id)
+{
+  struct stat st;
+
+  if(stat(hunt_id, &st) == -1)
+    {
+      if(mkdir(hunt_id, 0777) == -1)
+	{
+	  perror("Eroare la mkdir");
+	  exit(1);
+	}
+      else
+	{
+	  printf("Directorul %s a fost creat.\n", hunt_id);
+	}
+    }
+  else
+    {
+      printf("Directorul %s exista deja.\n", hunt_id);
+    }
+}
+
+
+int main(int argc, char** argv)
+{
+  if(argc < 3)
+    {
+      printf("Usage: %s --add <hunt_id>\n", argv[0]);
+      return 1;
+    }
+
+  if(strcmp(argv[1], "--add") == 0)
+    {
+      const char* hunt_id = argv[2];
+      printf("Am primit comanda add pentru hunt-ul: %s\n", hunt_id);
+      add_treasure(hunt_id);
+    }
+  else
+    {
+      printf("Comanda necunoscuta: %s\n", argv[1]);
+    }
+  return 0;
+}
