@@ -100,6 +100,31 @@ void list(const char* hunt_id)
 }
 
 
+void view(const char* hunt_id, char* treasure_id)
+{
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+
+  int f = open(path, O_RDONLY);
+
+  treasure t;
+  while(read(f, &t, sizeof(treasure)) == sizeof(treasure))
+    {
+      if(strcmp(t.id, treasure_id) == 0)
+	{
+	  printf("ID: %s | ", t.id);
+	  printf("Username: %s | ", t.username);
+	  printf("Location: %s | ", t.location);
+	  printf("Clue: %s | ", t.clue);
+	  printf("Value:%s\n", t.value);
+	  break;
+	}
+    }
+  close(f);
+}
+
+
 int main(int argc, char** argv)
 {
   if((argc < 3) || (argc > 4))//pt cand fac si alea cu 2 id-uri
@@ -118,6 +143,13 @@ int main(int argc, char** argv)
     {
       const char* hunt_id = argv[2];
       list(hunt_id);
+    }
+
+  if(strcmp(argv[1], "--view") == 0)
+    {
+      const char* hunt_id = argv[2];
+      char* treasure_id = argv[3];
+      view(hunt_id, treasure_id);
     }
   
   return 0;
