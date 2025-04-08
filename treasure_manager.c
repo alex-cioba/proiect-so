@@ -67,7 +67,7 @@ void add_treasure(const char* hunt_id)
   //writting
   write(f, &t, sizeof(treasure));
 
-  close(f); //close the binary file
+  close(f);
   
 }
 
@@ -102,16 +102,15 @@ void list(const char* hunt_id)
 
 int main(int argc, char** argv)
 {
-  if(argc < 3)
+  if((argc < 3) || (argc > 4))//pt cand fac si alea cu 2 id-uri
     {
-      printf("Usage: %s --add <hunt_id>\n", argv[0]);
+      printf("Usage: %s --add/list <hunt_id>\n", argv[0]);
       return 1;
     }
 
   if(strcmp(argv[1], "--add") == 0)
     {
       const char* hunt_id = argv[2];
-      printf("Am primit comanda add pentru hunt-ul: %s\n", hunt_id);
       add_treasure(hunt_id);
     }
 
