@@ -18,8 +18,27 @@ typedef struct treasure
 }treasure;
 
 
+void logg(const char* hunt_id, char* message)
+{
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/logged-hunt.bin");
+
+  int f = open(path, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+
+  write(f, message, strlen(message));
+  close(f);
+
+  char link_path[50];
+  strcpy(link_path, "logged_hunt-");
+  strcat(link_path, hunt_id);
+  symlink(path, link_path);
+}
+
+
 void add_treasure(const char* hunt_id)
 {
+  //creare director
   struct stat st;
 
   if(stat(hunt_id, &st) == -1) //checks if hunt_id exists
@@ -32,6 +51,10 @@ void add_treasure(const char* hunt_id)
       else
 	{
 	  printf("Directorul %s a fost creat\n", hunt_id);
+	  char message[50] = "A fost creat hunt-ul ";
+	  strcat(message, hunt_id);
+	  strcat(message, "\n");
+	  logg(hunt_id, message);
 	}
     }
 
@@ -68,6 +91,7 @@ void add_treasure(const char* hunt_id)
   write(f, &t, sizeof(treasure));
 
   close(f);
+  logg(hunt_id, "A fost adaugat un treasure\n");
   
 }
 
@@ -97,6 +121,7 @@ void list(const char* hunt_id)
     }
 
   close(f);
+  logg(hunt_id, "Au fost listate treasure-urile\n");
 }
 
 
@@ -121,6 +146,12 @@ void view(const char* hunt_id, char* treasure_id)
 	  break;
 	}
     }
+
+  char message[50] = "A fost vizualizat treasure-ul ";
+  strcat(message, treasure_id);
+  strcat(message, "\n");
+  logg(hunt_id, message);
+
   close(f);
 }
 
