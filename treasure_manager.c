@@ -149,14 +149,15 @@ void view(const char* hunt_id, const char* treasure_id)
 	  printf("Location: %s | ", t.location);
 	  printf("Clue: %s | ", t.clue);
 	  printf("Value:%s\n", t.value);
+
+	  //log action
+	  char message[50] = "Treasure ";
+	  strcat(message, treasure_id);
+	  strcat(message, " was viewed\n");
+	  logg(hunt_id, message);
 	  break;
 	}
     }
-
-  char message[50] = "Treasure ";
-  strcat(message, treasure_id);
-  strcat(message, " was viewed\n");
-  logg(hunt_id, message);
 
   close(f);
 }
