@@ -32,6 +32,11 @@ void logg(const char* hunt_id, char* message)
   char link_path[50];
   strcpy(link_path, "logged_hunt-");
   strcat(link_path, hunt_id);
+
+  if (access(link_path, F_OK) == 0)
+    {
+      unlink(link_path);
+    }
   symlink(path, link_path);
 }
 
@@ -50,11 +55,7 @@ void add_treasure(const char* hunt_id)
 	}
       else
 	{
-	  printf("Directorul %s a fost creat\n", hunt_id);
-	  char message[50] = "A fost creat hunt-ul ";
-	  strcat(message, hunt_id);
-	  strcat(message, "\n");
-	  logg(hunt_id, message);
+	  logg(hunt_id, "The hunt has been created\n");
 	}
     }
 
@@ -91,7 +92,11 @@ void add_treasure(const char* hunt_id)
   write(f, &t, sizeof(treasure));
 
   close(f);
-  logg(hunt_id, "A fost adaugat un treasure\n");
+
+  char message[50] = "Treasure ";
+  strcpy(message, t.id);
+  strcat(message, " was added\n");
+  logg(hunt_id, message);
   
 }
 
@@ -121,11 +126,12 @@ void list(const char* hunt_id)
     }
 
   close(f);
-  logg(hunt_id, "Au fost listate treasure-urile\n");
+  
+  logg(hunt_id, "All treasures were listed\n");
 }
 
 
-void view(const char* hunt_id, char* treasure_id)
+void view(const char* hunt_id, const char* treasure_id)
 {
   char path[50];
   strcpy(path, hunt_id);
@@ -147,16 +153,16 @@ void view(const char* hunt_id, char* treasure_id)
 	}
     }
 
-  char message[50] = "A fost vizualizat treasure-ul ";
+  char message[50] = "Treasure ";
   strcat(message, treasure_id);
-  strcat(message, "\n");
+  strcat(message, " was viewed\n");
   logg(hunt_id, message);
 
   close(f);
 }
 
 
-void remove_treasure(const char* hunt_id, char* treasure_id)
+void remove_treasure(const char* hunt_id, const char* treasure_id)
 {
   char path[50];
   strcpy(path, hunt_id);
@@ -186,14 +192,39 @@ void remove_treasure(const char* hunt_id, char* treasure_id)
   strcat(message, treasure_id);
   strcat(message, " has been removed\n");
   logg(hunt_id, message);
+  printf("%s\n", message);
+}
+
+void remove_hunt(const char* hunt_id)
+{
+  char path[50];
+  
+  //delete treasures
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+  remove(path);
+
+  //delete log
+  strcpy(path, hunt_id);
+  strcat(path, "/logged-hunt.bin");
+  remove(path);
+
+  //delete symlink
+  strcpy(path, "logged_hunt-");
+  strcat(path, hunt_id);
+  unlink(path);
+
+  //delete director
+  rmdir(hunt_id);
+  printf("Hunt %s has been removed\n", hunt_id);
 }
 
 
 int main(int argc, char** argv)
 {
-  if((argc < 3) || (argc > 4))//pt cand fac si alea cu 2 id-uri
+  if((argc < 3) || (argc > 4))
     {
-      printf("Usage: %s --add/list <hunt_id>\n", argv[0]);
+      printf("Usage: %s --add/list/remove <hunt_id> <treasure_id>\n", argv[0]);
       return 1;
     }
 
@@ -212,15 +243,22 @@ int main(int argc, char** argv)
   if(strcmp(argv[1], "--view") == 0)
     {
       const char* hunt_id = argv[2];
-      char* treasure_id = argv[3];
+      const char* treasure_id = argv[3];
       view(hunt_id, treasure_id);
     }
 
   if(strcmp(argv[1], "--remove") == 0)
     {
       const char* hunt_id = argv[2];
-      char* treasure_id = argv[3];
-      remove_treasure(hunt_id, treasure_id);
+      if(argc == 4)
+	{
+	  const char* treasure_id = argv[3];
+	  remove_treasure(hunt_id, treasure_id);
+	}
+      else
+	{
+	  remove_hunt(hunt_id);
+	}
     }
   
   return 0;
