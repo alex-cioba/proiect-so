@@ -156,6 +156,39 @@ void view(const char* hunt_id, char* treasure_id)
 }
 
 
+void remove_treasure(const char* hunt_id, char* treasure_id)
+{
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+
+  char path_new[50];
+  strcpy(path_new, hunt_id);
+  strcat(path_new, "/treasures_new.bin");
+
+  int f = open(path, O_RDONLY);
+  int f_new = open(path_new, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+
+  treasure t;
+  while(read(f, &t, sizeof(treasure)) == sizeof(treasure))
+    {
+      if(strcmp(t.id, treasure_id) != 0)
+	{
+	  write(f_new, &t, sizeof(treasure));
+	}
+    }
+  close(f);
+  close(f_new);
+  remove(path);
+  rename(path_new, path);
+
+  char message[50] = "Treasure ";
+  strcat(message, treasure_id);
+  strcat(message, " has been removed\n");
+  logg(hunt_id, message);
+}
+
+
 int main(int argc, char** argv)
 {
   if((argc < 3) || (argc > 4))//pt cand fac si alea cu 2 id-uri
@@ -181,6 +214,13 @@ int main(int argc, char** argv)
       const char* hunt_id = argv[2];
       char* treasure_id = argv[3];
       view(hunt_id, treasure_id);
+    }
+
+  if(strcmp(argv[1], "--remove") == 0)
+    {
+      const char* hunt_id = argv[2];
+      char* treasure_id = argv[3];
+      remove_treasure(hunt_id, treasure_id);
     }
   
   return 0;
