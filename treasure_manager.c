@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <dirent.h>
 
 
 typedef struct treasure
@@ -220,10 +221,73 @@ void remove_hunt(const char* hunt_id)
   printf("Hunt %s has been removed\n", hunt_id);
 }
 
+int is_directory(const char *path)
+{
+  struct stat statbuf;
+  if (stat(path, &statbuf) != 0)
+    {
+      return 0;
+    }
+
+  return S_ISDIR(statbuf.st_mode);
+}
+
+
+void functie_th(const char *hunt_id)
+{
+  char path[50];
+  strcpy(path, hunt_id);
+  strcat(path, "/treasures.bin");
+
+  int f = open(path, O_RDONLY);
+  if(f == -1)
+    {
+      return;
+    }
+
+  treasure t;
+  int ct = 0;
+  while(read(f, &t, sizeof(treasure)) == sizeof(treasure))
+    {
+      ct++;
+    }
+
+  close(f);
+  printf("Hunt: %s | %d treasures\n", hunt_id, ct);
+}
+
+
+void list_hunts()
+{
+  DIR *d = opendir(".");
+  struct dirent *entry;
+  
+  if (!d)
+    {
+      perror("Eroare deschidere director");
+      return;
+    }
+  
+  while ((entry = readdir(d)) != NULL)
+    {
+      // Ignora . si ..
+      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+	{
+	  continue;
+	}
+      
+      if (is_directory(entry->d_name))
+	{
+	  functie_th(entry->d_name);
+	}
+    }
+  
+}
+
 
 int main(int argc, char** argv)
 {
-  if((argc < 3) || (argc > 4))
+  if((argc < 2) || (argc > 4))
     {
       printf("Usage: %s --add/list/remove <hunt_id> <treasure_id>\n", argv[0]);
       return 1;
@@ -233,12 +297,14 @@ int main(int argc, char** argv)
     {
       const char* hunt_id = argv[2];
       add_treasure(hunt_id);
+      return 0;
     }
 
   if(strcmp(argv[1], "--list") == 0)
     {
       const char* hunt_id = argv[2];
       list(hunt_id);
+      return 0;
     }
 
   if(strcmp(argv[1], "--view") == 0)
@@ -246,6 +312,7 @@ int main(int argc, char** argv)
       const char* hunt_id = argv[2];
       const char* treasure_id = argv[3];
       view(hunt_id, treasure_id);
+      return 0;
     }
 
   if(strcmp(argv[1], "--remove") == 0)
@@ -260,6 +327,13 @@ int main(int argc, char** argv)
 	{
 	  remove_hunt(hunt_id);
 	}
+      return 0;
+    }
+
+  if(strcmp(argv[1], "--list_hunts") == 0)
+    {
+      list_hunts();
+      return 0;
     }
   
   return 0;
