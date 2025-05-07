@@ -56,7 +56,7 @@ void start_monitor() {
 
 void exit_monitor()
 {
-  if(pid != 0)
+  if(pid >= 0)
     {
       stop_monitor();
     }
@@ -83,6 +83,18 @@ void process_command(const char command[100])
   if(strcmp(command, "exit") == 0)
     {
       exit_monitor();
+      return;
+    }
+
+  if(strcmp(command, "list_treasures") == 0)
+    {
+      char id[10];
+      scanf("%s", id);
+      char path[50] = "./treasure_manager --list ";
+      
+      strcat(path, id);
+      system(path);
+  
       return;
     }
 }
