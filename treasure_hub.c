@@ -88,13 +88,29 @@ void process_command(const char command[100])
 
   if(strcmp(command, "list_treasures") == 0)
     {
-      char id[10];
-      scanf("%s", id);
-      char path[50] = "./treasure_manager --list ";
+      char hunt_id[10];
+      scanf("%s", hunt_id);
       
-      strcat(path, id);
+      char path[50] = "./treasure_manager --list ";
+      strcat(path, hunt_id);
+      
       system(path);
-  
+      return;
+    }
+
+  if(strcmp(command, "view_treasure") == 0)
+    {
+      char hunt_id[10];
+      char treasure_id[10];
+      scanf("%s", hunt_id);
+      scanf("%s", treasure_id);
+
+      char path[50] = "./treasure_manager --view ";
+      strcat(path, hunt_id);
+      strcat(path, " ");
+      strcat(path, treasure_id);
+
+      system(path);
       return;
     }
 }
