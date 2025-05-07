@@ -113,6 +113,13 @@ void process_command(const char command[100])
       system(path);
       return;
     }
+
+  if(strcmp(command, "list_hunts") == 0)
+    {
+      char path[32] = "./treasure_manager --list_hunts";
+      system(path);
+      return;
+    }
 }
 
 
