@@ -4,27 +4,106 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 pid_t pid = -1;
 
-void stop_monitor()
+
+void handler(int sig)
 {
-  if (pid <= 0)
+    if (sig == SIGUSR1)
     {
-      printf("Monitorul nu este pornit.\n");
-      return;
+        int f = open("command.txt", O_RDONLY);
+
+        char buffer[100];
+        int len = read(f, buffer, sizeof(buffer) - 1);
+        close(f);
+
+        buffer[len] = '\0';
+
+        char cmd[30], param1[30], param2[30];
+        int args = sscanf(buffer, "%s %s %s", cmd, param1, param2);
+
+        if (strcmp(cmd, "list_treasures") == 0 && args == 2)
+	  {
+            char path[100];
+            snprintf(path, sizeof(path), "./treasure_manager --list %s", param1);
+            system(path);
+            unlink("command.txt");
+            return;
+        }
+
+        if (strcmp(cmd, "view_treasure") == 0 && args == 3) {
+            char path[100];
+            snprintf(path, sizeof(path), "./treasure_manager --view %s %s", param1, param2);
+            system(path);
+            unlink("command.txt");
+            return;
+        }
+
+        if (strcmp(cmd, "list_hunts") == 0 && args == 1) {
+            system("./treasure_manager --list_hunts");
+            unlink("command.txt");
+            return;
+        }
+
+        printf("Comanda necunoscuta sau parametri lipsa: %s\n", buffer);
     }
-  
-  if (kill(pid, SIGTERM) == 0)
+
+    if (sig == SIGTERM)
     {
-      printf("Monitor oprit (PID %d).\n", pid);
-      pid = -1;
-    }
-  else
-    {
-      perror("Eroare la oprirea monitorului");
+        printf("Monitorul se opreste, PID = %d\n", getpid());
+        exit(0);
     }
 }
+
+
+
+
+void process_command(const char* command_line)
+{
+  if(strlen(command_line) == 0)
+    {
+      return;
+    }
+  if (strcmp(command_line, "stop_monitor") == 0) {
+    if (pid > 0) {
+      kill(pid, SIGTERM);
+      waitpid(pid, NULL, 0);
+      pid = -1;
+    } else {
+      printf("Monitorul e deja oprit\n");
+    }
+        return;
+  }
+  
+  if (strcmp(command_line, "exit") == 0) {
+    if (pid > 0) {
+      kill(pid, SIGTERM);
+      waitpid(pid, NULL, 0);
+            pid = -1;
+    }
+    
+    unlink("command.txt");
+    printf("Programul se opreste :(\n");
+    exit(0);
+    }
+  
+  if (pid > 0) {
+    int f = open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (f < 0) {
+      perror("Eroare la open()");
+      return;
+    }
+        write(f, command_line, strlen(command_line) + 1);
+        close(f);
+        kill(pid, SIGUSR1);
+  } else {
+    printf("Monitorul nu este pornit\n");
+  }
+}
+
+
 
 
 
@@ -43,95 +122,56 @@ void start_monitor() {
       }
     else
       {
-	if(pid == 0)
+	if(pid == 0) //copil
 	  {
 	    printf("Monitor pornit cu PID = %d\n", getpid());
+
+	    //definire semnale
+	    struct sigaction sa;
+	    sa.sa_handler = handler;
+	    sigemptyset(&sa.sa_mask);
+	    sa.sa_flags = 0;
+
+	    sigaction(SIGUSR1, &sa, NULL);
+	    sigaction(SIGTERM, &sa, NULL);
+	    
 	    while(1)
 	      {
-		pause();
+		pause(); //apeleaza automat handle_signal() cand primeste semnal
+	      }
+	  }
+	else //parinte
+	  {
+	    char command[100];
+	    while(1)
+	      {
+		fgets(command, sizeof(command), stdin);
+		command[strcspn(command, "\n")] = '\0';
+		process_command(command);
 	      }
 	  }
       }
 }
 
-void exit_monitor()
-{
-  if(pid >= 0)
-    {
-      stop_monitor();
-    }
-  
-  printf("Programul se opreste :(\n");
-  exit(0);
-}
-
-
-void process_command(const char command[100])
-{
-  if(strcmp(command, "start_monitor") == 0)
-    {
-      start_monitor();
-      return;
-    }
-
-  if(strcmp(command, "stop_monitor") == 0)
-    {
-      stop_monitor();
-      return;
-    }
-
-  if(strcmp(command, "exit") == 0)
-    {
-      exit_monitor();
-      return;
-    }
-
-  if(strcmp(command, "list_treasures") == 0)
-    {
-      char hunt_id[10];
-      scanf("%s", hunt_id);
-      
-      char path[50] = "./treasure_manager --list ";
-      strcat(path, hunt_id);
-      
-      system(path);
-      return;
-    }
-
-  if(strcmp(command, "view_treasure") == 0)
-    {
-      char hunt_id[10];
-      char treasure_id[10];
-      scanf("%s", hunt_id);
-      scanf("%s", treasure_id);
-
-      char path[50] = "./treasure_manager --view ";
-      strcat(path, hunt_id);
-      strcat(path, " ");
-      strcat(path, treasure_id);
-
-      system(path);
-      return;
-    }
-
-  if(strcmp(command, "list_hunts") == 0)
-    {
-      char path[32] = "./treasure_manager --list_hunts";
-      system(path);
-      return;
-    }
-}
 
 
 int main()
 {
-    char command[100];
+    char command[50];
 
     while(1)
       {
-        printf(">>> ");
-        scanf("%s", command);
-	process_command(command);
+        fgets(command, sizeof(command), stdin);
+	command[strcspn(command, "\n")] = '\0';
+        if(strcmp(command, "start_monitor") == 0)
+	  {
+	    start_monitor();
+	    break;
+	  }
+	else
+	  {
+	    printf("Monitorul nu este pornit (start_monitor)\n");
+	  }
 	
       }
     
