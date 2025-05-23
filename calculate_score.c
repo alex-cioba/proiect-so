@@ -30,7 +30,7 @@ int find_user(struct user_score* users, int count, const char* name)
 	  return i;
         }
     }
-  return -1; //nu mai exista alta intrare pentru acel user
+  return -1;
 }
 
 
