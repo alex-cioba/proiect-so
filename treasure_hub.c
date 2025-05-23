@@ -10,14 +10,13 @@
 #include <sys/stat.h>
 
 pid_t pid = -1;
-int pipe_fd[2];
+int pipe_monitor[2];
 int closing = 0;
 
 
-
-void handler(int sig)
+void handler(int semnal)
 {
-    if (sig == SIGUSR1)
+    if (semnal == SIGUSR1)
       {
         int f = open("command.txt", O_RDONLY);
 	if(f < 0)
@@ -38,34 +37,34 @@ void handler(int sig)
 
         buffer[len] = '\0';
 
-        char cmd[35], param1[35], param2[35];
-        int args = sscanf(buffer, "%s %s %s", cmd, param1, param2);
+        char comanda[35], p1[35], p2[35];
+        int nr_parametri = sscanf(buffer, "%s %s %s", comanda, p1, p2);
 
 
 	pid_t nepotul = fork();
 	if(nepotul == 0)
 	  {
-	    dup2(pipe_fd[1], STDOUT_FILENO);
-	    dup2(pipe_fd[1], STDERR_FILENO);
-	    close(pipe_fd[0]);
-	    close(pipe_fd[1]);
+	    dup2(pipe_monitor[1], STDOUT_FILENO);
+	    dup2(pipe_monitor[1], STDERR_FILENO);
+	    close(pipe_monitor[0]);
+	    close(pipe_monitor[1]);
 
 	    
-	    if (strcmp(cmd, "list_treasures") == 0 && args == 2)
+	    if ((strcmp(comanda, "list_treasures") == 0) && (nr_parametri == 2))
 	      {
-		execl("./treasure_manager", "treasure_manager", "--list", param1, (char *)NULL);
+		execl("./treasure_manager", "treasure_manager", "--list", p1, (char *)NULL);
 		perror("Eroare list_treasures");
 		_exit(1);
 	      }
 	    
-	    if (strcmp(cmd, "view_treasure") == 0 && args == 3)
+	    if ((strcmp(comanda, "view_treasure") == 0) && (nr_parametri == 3))
 	      {
-		execl("./treasure_manager", "treasure_manager", "--view", param1, param2, (char *)NULL);
+		execl("./treasure_manager", "treasure_manager", "--view", p1, p2, (char *)NULL);
 		perror("Eroare view_treasure");
 		_exit(1);
 	      }
 	    
-	    if (strcmp(cmd, "list_hunts") == 0 && args == 1)
+	    if ((strcmp(comanda, "list_hunts") == 0) && (nr_parametri == 1))
 	      {
 		execl("./treasure_manager", "treasure_manager", "--list_hunts", (char *)NULL);
 		perror("Eroare list_hunts");
@@ -79,8 +78,8 @@ void handler(int sig)
 	  {
 	    if(nepotul > 0)
 	      {
-		waitpid(nepotul, NULL, 0);
-		unlink("command.txt");
+		waitpid(nepotul, NULL, 0); //asteptam sa se incheie procesul care da execl()
+		unlink("command.txt"); //sterge fisierul la final
 	      }
 	    else
 	      {
@@ -89,7 +88,7 @@ void handler(int sig)
 	  }
     }
     
-    if (sig == SIGTERM)
+    if (semnal == SIGTERM)
       {
 	exit(0); //iese din procesul copil
       }
@@ -115,7 +114,7 @@ void start_monitor() {
       {
 	if(pid == 0) //copil
 	  {
-	    close(pipe_fd[0]);
+	    close(pipe_monitor[0]);
 	    struct sigaction sa;
 	    sa.sa_handler = handler;
 	    sigemptyset(&sa.sa_mask);
@@ -126,7 +125,7 @@ void start_monitor() {
 	    
 	    while(1)
 	      {
-		pause();
+		pause(); //asteapta semnale
 	      }
 	  }
 	else //parinte
@@ -330,7 +329,7 @@ void *citire_monitor(void *arg)
   char buffer[256];
   while(1)
     {
-      ssize_t n = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
+      ssize_t n = read(pipe_monitor[0], buffer, sizeof(buffer) - 1);
       if(n > 0)
 	{
 	  buffer[n] = '\0';
@@ -368,7 +367,7 @@ void *citire_stdin(void *arg)
 
 int main() //procesul parinte
 {
-    if (pipe(pipe_fd) < 0)
+    if (pipe(pipe_monitor) < 0)
       {
         perror("Eroare la pipe()");
         exit(1);
