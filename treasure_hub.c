@@ -9,94 +9,9 @@
 
 pid_t pid = -1;
 int pipe_fd[2];
+int closing = 0;
 
 
-void process_command(const char* command_line)
-{
-  if(strlen(command_line) == 0)
-    {
-      return;
-    }
-  if (strcmp(command_line, "stop_monitor") == 0)
-    {
-      if (pid > 0)
-	{
-	  kill(pid, SIGTERM);
-	  waitpid(pid, NULL, 0);
-	  pid = -1;
-	}
-      else
-	{
-	  printf("Monitorul e deja oprit\n");
-	}
-      return;
-    }
-  
-  if (strcmp(command_line, "exit") == 0)
-    {
-      if (pid > 0)
-	{
-	  kill(pid, SIGTERM);
-	  waitpid(pid, NULL, 0);
-	  pid = -1;
-	}
-      
-      unlink("command.txt");
-      printf("Programul se opreste :(\n");
-      exit(0);
-    }
-  
-  if (pid > 0)
-    {
-      int f = open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-      if (f < 0)
-	{
-	  perror("Eroare la open()");
-	  return;
-	}
-      write(f, command_line, strlen(command_line));
-      fsync(f);
-      close(f);
-      kill(pid, SIGUSR1);
-  }
-  else
-    {
-      printf("Monitorul nu este pornit\n");
-    }
-}
-
-
-
-void *citire_monitor(void *arg)
-{
-  char buffer[256];
-  while(1)
-    {
-      ssize_t n = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
-      if(n > 0)
-	{
-	  buffer[n] = '\0';
-	  printf("[Parinte, PID = %d]:\n%s", getpid(), buffer);
-	  printf(">>> ");
-	  fflush(stdout);
-	}
-    }
-  return NULL;
-}
-
-void *citire_stdin(void *arg)
-{
-  char command[100];
-  while(1)
-    {
-      if(fgets(command, sizeof(command), stdin))
-	{
-	  command[strcspn(command, "\n")] = '\0';
-	  process_command(command);
-	}
-    }
-  return NULL;
-}
 
 void handler(int sig)
 {
@@ -174,8 +89,7 @@ void handler(int sig)
     
     if (sig == SIGTERM)
       {
-	write(STDOUT_FILENO, "Monitorul se opreste\n", 22);
-	exit(0);
+	exit(0); //iese din procesul copil
       }
 }
 
@@ -188,11 +102,6 @@ void start_monitor() {
         return;
       }
 
-    if(pipe(pipe_fd) < 0)
-      {
-	perror("Eroare la pipe()");
-	exit(1);
-      }
     pid = fork();
 
     if (pid < 0)
@@ -222,41 +131,155 @@ void start_monitor() {
 	  {
 	    printf("Monitor pornit cu PID = %d\n", pid);
 	    printf("Parintele are PID = %d\n", getpid());
-	    printf(">>> ");
-	    close(pipe_fd[1]);
-
-	    pthread_t t1, t2;
-	    pthread_create(&t1, NULL, citire_stdin, NULL);
-	    pthread_create(&t2, NULL, citire_monitor, NULL);
-
-	    pthread_join(t1, NULL);
-	    pthread_join(t2, NULL);
+	    return;
 	  }
       }
 }
 
 
 
-int main()
+void *stop_monitor(void *arg)
 {
-    char command[50];
+  printf("Monitorul se opreste...\n");
+  sleep(5);
 
-    while(1)
+  kill(pid, SIGTERM);
+  waitpid(pid, NULL, 0);
+  pid = -1;
+  closing = 0;
+  printf("Monitorul a fost oprit\n");
+  printf(">>> ");
+  fflush(stdout);
+  return NULL;
+}
+
+
+
+void process_command(const char* command_line)
+{
+  if(strlen(command_line) == 0)
+    {
+      return;
+    }
+
+  if(closing == 1)
+    {
+      printf("Monitorul e in proces de oprire si nu se pot trimite comenzi\n");
+      return;
+    }
+
+  if(strcmp(command_line, "start_monitor") == 0)
+    {
+      start_monitor();
+      return;
+    }
+  
+  if (strcmp(command_line, "stop_monitor") == 0)
+    {
+      if (pid > 0)
+	{
+	  closing = 1;
+	  pthread_t oprire;
+	  pthread_create(&oprire, NULL, stop_monitor, NULL);
+	  pthread_detach(oprire);
+	}
+      else
+	{
+	  printf("Monitorul e deja oprit\n");
+	}
+      return;
+    }
+  
+  if (strcmp(command_line, "exit") == 0)
+    {
+      if (pid > 0)
+	{
+	  printf("Monitorul e inca pornit (stop_monitor)\n");
+	  return;
+	}
+      
+      unlink("command.txt");
+      printf("Programul se opreste :(\n");
+      exit(0);
+    }
+  
+  if (pid > 0)
+    {
+      int f = open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+      if (f < 0)
+	{
+	  perror("Eroare la open()");
+	  return;
+	}
+      write(f, command_line, strlen(command_line));
+      fsync(f);
+      close(f);
+      kill(pid, SIGUSR1);
+  }
+  else
+    {
+      printf("Monitorul nu este pornit (start_monitor)\n");
+    }
+}
+
+
+
+
+void *citire_monitor(void *arg)
+{
+  char buffer[256];
+  while(1)
+    {
+      ssize_t n = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
+      if(n > 0)
+	{
+	  buffer[n] = '\0';
+	  printf("[Parinte, PID = %d]:\n%s", getpid(), buffer);
+	  if(closing == 0)
+	    {
+	      printf(">>> ");
+	      fflush(stdout);
+	    }
+	}
+    }
+  return NULL;
+}
+
+void *citire_stdin(void *arg)
+{
+  char command[100];
+  while(1)
+    {
+      if(closing == 0)
+	{
+	  printf(">>> ");
+	  fflush(stdout);
+	}
+      if(fgets(command, sizeof(command), stdin))
+	{
+	  command[strcspn(command, "\n")] = '\0';
+	  process_command(command);
+	}
+    }
+  return NULL;
+}
+
+
+
+int main() //procesul parinte
+{
+    if (pipe(pipe_fd) < 0)
       {
-	printf(">>> ");
-        fgets(command, sizeof(command), stdin);
-	command[strcspn(command, "\n")] = '\0';
-        if(strcmp(command, "start_monitor") == 0)
-	  {
-	    start_monitor();
-	    break;
-	  }
-	else
-	  {
-	    printf("Monitorul nu este pornit (start_monitor)\n");
-	  }
-	
+        perror("Eroare la pipe()");
+        exit(1);
       }
+
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, citire_stdin, NULL);
+    pthread_create(&t2, NULL, citire_monitor, NULL);
     
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+
     return 0;
 }
