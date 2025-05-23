@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 pid_t pid = -1;
 int pipe_fd[2];
@@ -38,7 +40,7 @@ void handler(int sig)
 
         char cmd[35], param1[35], param2[35];
         int args = sscanf(buffer, "%s %s %s", cmd, param1, param2);
-	
+
 
 	pid_t nepotul = fork();
 	if(nepotul == 0)
@@ -137,6 +139,96 @@ void start_monitor() {
 }
 
 
+int is_hunt(const char *hunt_id)
+{
+  struct stat statbuf;
+  if(stat(hunt_id, &statbuf) != 0 || !S_ISDIR(statbuf.st_mode))
+    {
+      return 0;
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasures.bin", hunt_id);
+
+  if(access(path, F_OK) == 0)
+    {
+      return 1;
+    }
+
+  return 0;
+}
+
+
+void calculate_score()
+{
+  DIR *dir = opendir(".");
+  struct dirent *entry;
+
+  if(!dir)
+    {
+      perror("Eroare deschidere director");
+      return;
+    }
+
+  while((entry = readdir(dir)) != NULL)
+    {
+      if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+	{
+	  continue;
+	}
+
+      if(!is_hunt(entry->d_name))
+	{
+	  continue;
+	}
+
+      const char *name = entry->d_name;
+      int fd[2];
+      if(pipe(fd) < 0)
+	{
+	  perror("pipe");
+	  continue;
+	}
+
+      pid_t pid = fork();
+      if(pid < 0)
+	{
+	  perror("fork");
+	  close(fd[0]);
+	  close(fd[1]);
+	  continue;
+	}
+
+      if(pid == 0) //copil
+	{
+	  close(fd[0]);
+	  dup2(fd[1], STDOUT_FILENO);
+	  close(fd[1]);
+
+	  execl("./calculate_score", "calculate_score", name, NULL);
+	  perror("execl");
+	  _exit(1);
+	}
+      else //parinte
+	{
+	  close(fd[1]);
+	  char buffer[256];
+	  ssize_t n;
+	  printf("[Score - %s]\n", name);
+	  while((n = read(fd[0], buffer, sizeof(buffer)-1)) > 0)
+	    {
+	      buffer[n] = '\0';
+	      printf("%s", buffer);
+	    }
+
+	  close(fd[0]);
+	  waitpid(pid, NULL, 0);
+	}
+    }
+  closedir(dir);
+}
+
+
 
 void *stop_monitor(void *arg)
 {
@@ -152,6 +244,8 @@ void *stop_monitor(void *arg)
   fflush(stdout);
   return NULL;
 }
+
+
 
 
 
@@ -201,6 +295,12 @@ void process_command(const char* command_line)
       unlink("command.txt");
       printf("Programul se opreste :(\n");
       exit(0);
+    }
+
+  if(strcmp(command_line, "calculate_score") == 0)
+    {
+      calculate_score();
+      return;
     }
   
   if (pid > 0)
